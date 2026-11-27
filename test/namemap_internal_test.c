@@ -1,0 +1,395 @@
+/*
+ * Copyright 2019-2026 The OpenSSL Project Authors. All Rights Reserved.
+ *
+ * Licensed under the Apache License 2.0 (the "License").  You may not use
+ * this file except in compliance with the License.  You can obtain a copy
+ * in the file LICENSE in the source distribution or at
+ * https://www.openssl.org/source/license.html
+ */
+
+#include <ctype.h>
+#include <stdio.h>
+#include <string.h>
+#include <openssl/evp.h>
+#include "internal/namemap.h"
+#include "testutil.h"
+
+#define NAME1 "name1"
+#define NAME2 "name2"
+#define ALIAS1 "alias1"
+#define ALIAS1_UC "ALIAS1"
+
+static int test_namemap_empty(void)
+{
+    OSSL_NAMEMAP *nm = NULL;
+    int ok;
+
+    ok = TEST_int_eq(ossl_namemap_empty(NULL), 1)
+        && TEST_ptr(nm = ossl_namemap_new(NULL))
+        && TEST_int_eq(ossl_namemap_empty(nm), 1)
+        && TEST_int_ne(ossl_namemap_add_name(nm, 0, NAME1), 0)
+        && TEST_int_eq(ossl_namemap_empty(nm), 0);
+    ossl_namemap_free(nm);
+    return ok;
+}
+
+static int test_namemap(OSSL_NAMEMAP *nm)
+{
+    int num1 = ossl_namemap_add_name(nm, 0, NAME1);
+    int num2 = ossl_namemap_add_name(nm, 0, NAME2);
+    int num3 = ossl_namemap_add_name(nm, num1, ALIAS1);
+    int num4 = ossl_namemap_add_name(nm, 0, ALIAS1_UC);
+    int check1 = ossl_namemap_name2num(nm, NAME1);
+    int check2 = ossl_namemap_name2num(nm, NAME2);
+    int check3 = ossl_namemap_name2num(nm, ALIAS1);
+    int check4 = ossl_namemap_name2num(nm, ALIAS1_UC);
+    int false1 = ossl_namemap_name2num(nm, "cookie");
+
+    return TEST_int_ne(num1, 0)
+        && TEST_int_ne(num2, 0)
+        && TEST_int_eq(num1, num3)
+        && TEST_int_eq(num3, num4)
+        && TEST_int_eq(num1, check1)
+        && TEST_int_eq(num2, check2)
+        && TEST_int_eq(num3, check3)
+        && TEST_int_eq(num4, check4)
+        && TEST_int_eq(false1, 0);
+}
+
+/*
+ * The number of names has no limit, whatever the size of the name->number
+ * table, and every one of them stays findable under any letter case.
+ */
+static int test_namemap_many(void)
+{
+    OSSL_NAMEMAP *nm = ossl_namemap_new(NULL);
+    char name[32], alias[32];
+    int i, num, ok = 0;
+    const int count = 5000;
+
+    if (!TEST_ptr(nm))
+        return 0;
+    for (i = 0; i < count; i++) {
+        snprintf(name, sizeof(name), "name-%d", i);
+        snprintf(alias, sizeof(alias), "Alias.%d", i);
+        if (!TEST_int_eq(num = ossl_namemap_add_name(nm, 0, name), i + 1)
+            || !TEST_int_eq(ossl_namemap_add_name(nm, num, alias), num))
+            goto end;
+    }
+    for (i = 0; i < count; i++) {
+        snprintf(name, sizeof(name), "NAME-%d", i);
+        snprintf(alias, sizeof(alias), "alias.%d", i);
+        if (!TEST_int_eq(ossl_namemap_name2num(nm, name), i + 1)
+            || !TEST_int_eq(ossl_namemap_name2num(nm, alias), i + 1)
+            || !TEST_int_eq(ossl_namemap_name2num_n(nm, name, 4), 0))
+            goto end;
+        snprintf(name, sizeof(name), "name-%d", i);
+        if (!TEST_str_eq(ossl_namemap_num2name(nm, i + 1, 0), name))
+            goto end;
+    }
+    ok = TEST_int_eq(ossl_namemap_name2num(nm, "name-5000"), 0);
+end:
+    ossl_namemap_free(nm);
+    return ok;
+}
+
+/* Names are told apart by their first 64 characters only. */
+static int test_namemap_long(void)
+{
+    OSSL_NAMEMAP *nm = ossl_namemap_new(NULL);
+    char n63[64], n64[65], n70a[71], n70b[71];
+    int num63, num64, ok;
+
+    memset(n63, 'a', 63);
+    n63[63] = '\0';
+    memset(n64, 'a', 64);
+    n64[64] = '\0';
+    memset(n70a, 'a', 70);
+    n70a[70] = '\0';
+    memset(n70b, 'A', 64);
+    memcpy(n70b + 64, "bcdefg", 7);
+
+    ok = TEST_ptr(nm)
+        && TEST_int_ne(num63 = ossl_namemap_add_name(nm, 0, n63), 0)
+        && TEST_int_ne(num64 = ossl_namemap_add_name(nm, 0, n70a), 0)
+        && TEST_int_ne(num63, num64)
+        /* The same first 64 characters: the same name */
+        && TEST_int_eq(ossl_namemap_add_name(nm, 0, n64), num64)
+        && TEST_int_eq(ossl_namemap_name2num(nm, n64), num64)
+        && TEST_int_eq(ossl_namemap_name2num(nm, n70b), num64)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, n70b, 64), num64)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, n70b, 63), num63)
+        && TEST_int_eq(ossl_namemap_name2num(nm, n63), num63)
+        /* The name is kept whole all the same */
+        && TEST_str_eq(ossl_namemap_num2name(nm, num64, 0), n70a)
+        && TEST_ptr_null(ossl_namemap_num2name(nm, num64, 1));
+    ossl_namemap_free(nm);
+    return ok;
+}
+
+/*
+ * A space is a character like any other, wherever it is: a name with a
+ * space before or after it is another name.
+ */
+static int test_namemap_spaces(void)
+{
+    OSSL_NAMEMAP *nm = ossl_namemap_new(NULL);
+    int num = 0, after = 0, before = 0, ok;
+
+    ok = TEST_ptr(nm)
+        && TEST_int_ne(num = ossl_namemap_add_name(nm, 0, "name"), 0)
+        && TEST_int_eq(ossl_namemap_name2num(nm, "name "), 0)
+        && TEST_int_eq(ossl_namemap_name2num(nm, " name"), 0)
+        && TEST_int_eq(ossl_namemap_name2num(nm, "na me"), 0)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, "name ", 4), num)
+        && TEST_int_ne(after = ossl_namemap_add_name(nm, 0, "name "), 0)
+        && TEST_int_ne(before = ossl_namemap_add_name(nm, 0, " name"), 0)
+        && TEST_int_ne(after, num)
+        && TEST_int_ne(before, num)
+        && TEST_int_ne(before, after)
+        && TEST_int_eq(ossl_namemap_name2num(nm, "NAME"), num)
+        && TEST_int_eq(ossl_namemap_name2num(nm, "NAME "), after)
+        && TEST_int_eq(ossl_namemap_name2num(nm, " NAME"), before)
+        && TEST_int_eq(ossl_namemap_name2num(nm, "name  "), 0)
+        /* As a second name of the same number, too */
+        && TEST_int_eq(ossl_namemap_add_names(nm, 0, "other:other ", ':'),
+            before + 1)
+        && TEST_str_eq(ossl_namemap_num2name(nm, before + 1, 1), "other ");
+    ossl_namemap_free(nm);
+    return ok;
+}
+
+/*
+ * A lookup with a length does not read a name beyond its NUL, whatever the
+ * length, and what follows the NUL is not part of the name.
+ */
+static int test_namemap_past_nul(void)
+{
+    OSSL_NAMEMAP *nm = ossl_namemap_new(NULL);
+    char exact[5] = "name";
+    int num = 0, ok;
+
+    ok = TEST_ptr(nm)
+        && TEST_int_ne(num = ossl_namemap_add_name(nm, 0, "name"), 0)
+        && TEST_int_ne(ossl_namemap_add_name(nm, 0, "name junk"), num)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, "name\0junk", 4), num)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, "name\0junk", 9), 0)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, exact, 5), 0)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, exact, 64), 0)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, exact, 1000), 0)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, "", 4), 0)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, NULL, 4), 0)
+        && TEST_int_eq(ossl_namemap_name2num_n(nm, NULL, 0), 0);
+    ossl_namemap_free(nm);
+    return ok;
+}
+
+static int test_namemap_independent(void)
+{
+    OSSL_NAMEMAP *nm = ossl_namemap_new(NULL);
+    int ok = TEST_ptr(nm) && test_namemap(nm);
+
+    ossl_namemap_free(nm);
+    return ok;
+}
+
+static int test_namemap_stored(void)
+{
+    OSSL_NAMEMAP *nm = ossl_namemap_stored(NULL);
+
+    return TEST_ptr(nm)
+        && test_namemap(nm);
+}
+
+/*
+ * Test that EVP_get_digestbyname() will use the namemap when it can't find
+ * entries in the legacy method database.
+ */
+static int test_digestbyname(void)
+{
+    int id;
+    OSSL_NAMEMAP *nm = ossl_namemap_stored(NULL);
+    const EVP_MD *sha256, *foo;
+
+    if (!TEST_ptr(nm))
+        return 0;
+    id = ossl_namemap_add_name(nm, 0, "SHA256");
+    if (!TEST_int_ne(id, 0))
+        return 0;
+    if (!TEST_int_eq(ossl_namemap_add_name(nm, id, "foo"), id))
+        return 0;
+
+    sha256 = EVP_get_digestbyname("SHA256");
+    if (!TEST_ptr(sha256))
+        return 0;
+    foo = EVP_get_digestbyname("foo");
+    if (!TEST_ptr_eq(sha256, foo))
+        return 0;
+
+    return 1;
+}
+
+/*
+ * Test that EVP_get_cipherbyname() will use the namemap when it can't find
+ * entries in the legacy method database.
+ */
+static int test_cipherbyname(void)
+{
+    int id;
+    OSSL_NAMEMAP *nm = ossl_namemap_stored(NULL);
+    const EVP_CIPHER *aes128, *bar;
+
+    if (!TEST_ptr(nm))
+        return 0;
+    id = ossl_namemap_add_name(nm, 0, "AES-128-CBC");
+    if (!TEST_int_ne(id, 0))
+        return 0;
+    if (!TEST_int_eq(ossl_namemap_add_name(nm, id, "bar"), id))
+        return 0;
+
+    aes128 = EVP_get_cipherbyname("AES-128-CBC");
+    if (!TEST_ptr(aes128))
+        return 0;
+    bar = EVP_get_cipherbyname("bar");
+    if (!TEST_ptr_eq(aes128, bar))
+        return 0;
+
+    return 1;
+}
+
+/*
+ * Test that EVP_CIPHER_is_a() responds appropriately, even for ciphers that
+ * are entirely legacy.
+ */
+static int test_cipher_is_a(void)
+{
+    EVP_CIPHER *fetched = EVP_CIPHER_fetch(NULL, "AES-256-CCM", NULL);
+    int rv = 1;
+
+    if (!TEST_ptr(fetched))
+        return 0;
+    if (!TEST_true(EVP_CIPHER_is_a(fetched, "id-aes256-CCM"))
+        || !TEST_false(EVP_CIPHER_is_a(fetched, "AES-128-GCM")))
+        rv = 0;
+    if (!TEST_true(EVP_CIPHER_is_a(EVP_aes_256_gcm(), "AES-256-GCM"))
+        || !TEST_false(EVP_CIPHER_is_a(EVP_aes_256_gcm(), "AES-128-CCM")))
+        rv = 0;
+
+    EVP_CIPHER_free(fetched);
+    return rv;
+}
+
+/*
+ * Test that EVP_MD_is_a() responds appropriately, even for MDs that are
+ * entirely legacy.
+ */
+static int test_digest_is_a(void)
+{
+    EVP_MD *fetched = EVP_MD_fetch(NULL, "SHA2-512", NULL);
+    int rv = 1;
+
+    if (!TEST_ptr(fetched))
+        return 0;
+    if (!TEST_true(EVP_MD_is_a(fetched, "SHA512"))
+        || !TEST_false(EVP_MD_is_a(fetched, "SHA1")))
+        rv = 0;
+    if (!TEST_true(EVP_MD_is_a(EVP_sha256(), "SHA2-256"))
+        || !TEST_false(EVP_MD_is_a(EVP_sha256(), "SHA3-256")))
+        rv = 0;
+
+    EVP_MD_free(fetched);
+    return rv;
+}
+
+/*
+ * Test memory failures for ossl_namemap_add_name.
+ */
+static int test_namemap_add_name_mfail(void)
+{
+    OSSL_NAMEMAP *nm = NULL;
+    int ret = 0;
+
+    nm = ossl_namemap_new(NULL);
+    if (!TEST_ptr(nm))
+        goto err;
+
+    MFAIL_start();
+    ret = ossl_namemap_add_name(nm, 0, "mfail_test_name");
+    MFAIL_end();
+
+err:
+    ossl_namemap_free(nm);
+    return ret;
+}
+
+/*
+ * Keys are hashed and compared a word at a time, the last word overlapping
+ * the one before it. Names of every length around the word size are found
+ * under either letter case of any character, and are told apart from a name
+ * that differs in any one character or in length.
+ */
+static int test_namemap_lengths(void)
+{
+    static const char letters[] = "abcdefghijklmnopqrstuvwxyz";
+    OSSL_NAMEMAP *nm = ossl_namemap_new(NULL);
+    char name[26], other[sizeof(name) + 1];
+    size_t len, i;
+    int ok = 0;
+
+    if (!TEST_ptr(nm))
+        return 0;
+    /* The name of length |len| gets the number |len| */
+    for (len = 1; len < sizeof(name); len++) {
+        for (i = 0; i < len; i++)
+            name[i] = letters[(i * 7 + len) % 26];
+        name[len] = '\0';
+        if (!TEST_int_eq(ossl_namemap_add_name(nm, 0, name), (int)len))
+            goto end;
+    }
+    for (len = 1; len < sizeof(name); len++) {
+        for (i = 0; i < len; i++)
+            name[i] = letters[(i * 7 + len) % 26];
+        name[len] = '\0';
+        if (!TEST_int_eq(ossl_namemap_name2num(nm, name), (int)len)
+            || !TEST_int_eq(ossl_namemap_name2num_n(nm, name, len - 1), 0))
+            goto end;
+        /* One character more */
+        memcpy(other, name, len);
+        other[len] = name[0];
+        other[len + 1] = '\0';
+        if (!TEST_int_eq(ossl_namemap_name2num(nm, other), 0)
+            || !TEST_int_eq(ossl_namemap_name2num_n(nm, other, len), (int)len))
+            goto end;
+        for (i = 0; i < len; i++) {
+            memcpy(other, name, len + 1);
+            other[i] = (char)toupper((unsigned char)name[i]);
+            if (!TEST_int_eq(ossl_namemap_name2num(nm, other), (int)len))
+                goto end;
+            other[i] = letters[(i * 7 + len + 1) % 26];
+            if (!TEST_int_eq(ossl_namemap_name2num(nm, other), 0))
+                goto end;
+        }
+    }
+    ok = 1;
+end:
+    ossl_namemap_free(nm);
+    return ok;
+}
+
+int setup_tests(void)
+{
+    ADD_TEST(test_namemap_empty);
+    ADD_TEST(test_namemap_independent);
+    ADD_TEST(test_namemap_many);
+    ADD_TEST(test_namemap_long);
+    ADD_TEST(test_namemap_lengths);
+    ADD_TEST(test_namemap_spaces);
+    ADD_TEST(test_namemap_past_nul);
+    ADD_TEST(test_namemap_stored);
+    ADD_TEST(test_digestbyname);
+    ADD_TEST(test_cipherbyname);
+    ADD_TEST(test_digest_is_a);
+    ADD_TEST(test_cipher_is_a);
+    ADD_MFAIL_TEST(test_namemap_add_name_mfail);
+    return 1;
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=Event broker service for crypto-auditing project
+StartLimitInterval=10s
+StartLimitBurst=5
+After=crau-agent.service
+
+[Service]
+ExecStart=/usr/bin/crau-event-broker
+KillSignal=SIGINT
+TimeoutSec=60s
+Restart=on-failure
+RestartSec=120s
+# User=crypto-auditing
+# Group=crypto-auditing
+
+[Install]
+Also=crau-event-broker.socket

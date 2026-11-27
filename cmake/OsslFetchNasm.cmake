@@ -1,0 +1,40 @@
+# Verified, last-resort NASM bootstrap for a git source tree without generated
+# autoconf files. An existing staged executable is never downloaded again.
+foreach(_v OSSL_NASM_URL OSSL_NASM_URL_HASH OSSL_NASM_DEST)
+  if(NOT DEFINED ${_v} OR "${${_v}}" STREQUAL "")
+    message(FATAL_ERROR "OsslFetchNasm: required variable ${_v} is not set")
+  endif()
+endforeach()
+if(EXISTS "${OSSL_NASM_DEST}")
+  message(STATUS "OsslFetchNasm: using existing ${OSSL_NASM_DEST}")
+  return()
+endif()
+
+get_filename_component(_dest_dir "${OSSL_NASM_DEST}" DIRECTORY)
+set(_tmp "${_dest_dir}/nasm-fetch")
+file(REMOVE_RECURSE "${_tmp}")
+file(MAKE_DIRECTORY "${_tmp}")
+set(_archive "${_tmp}/nasm.zip")
+message(STATUS "OsslFetchNasm: downloading ${OSSL_NASM_URL}")
+file(DOWNLOAD "${OSSL_NASM_URL}" "${_archive}"
+     EXPECTED_HASH "${OSSL_NASM_URL_HASH}"
+     STATUS _dl_status SHOW_PROGRESS)
+list(GET _dl_status 0 _dl_rc)
+if(NOT _dl_rc EQUAL 0)
+  message(FATAL_ERROR "OsslFetchNasm: verified download failed: ${_dl_status}")
+endif()
+
+execute_process(COMMAND "${CMAKE_COMMAND}" -E tar xf "${_archive}"
+                WORKING_DIRECTORY "${_tmp}" RESULT_VARIABLE _x_rc)
+if(NOT _x_rc EQUAL 0)
+  message(FATAL_ERROR "OsslFetchNasm: cannot extract ${_archive}")
+endif()
+file(GLOB_RECURSE _found "${_tmp}/nasm.exe")
+list(LENGTH _found _n)
+if(NOT _n EQUAL 1)
+  message(FATAL_ERROR "OsslFetchNasm: expected exactly one nasm.exe, found ${_n}")
+endif()
+list(GET _found 0 _exe)
+file(COPY_FILE "${_exe}" "${OSSL_NASM_DEST}" ONLY_IF_DIFFERENT)
+file(REMOVE_RECURSE "${_tmp}")
+message(STATUS "OsslFetchNasm: installed ${OSSL_NASM_DEST}")

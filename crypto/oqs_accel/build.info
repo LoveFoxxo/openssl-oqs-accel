@@ -1,0 +1,9 @@
+LIBS = ../../libcrypto
+
+# Native fallbacks must also link with no-oqs-accel, so always compile the
+# bridge/stubs. Only the default-provider libcrypto copy may enable liboqs.
+SOURCE[../../libcrypto]=oqs_accel.c
+SOURCE[../../providers/libfips.a]=oqs_accel.c
+IF[{- !$disabled{'oqs-accel'} -}]
+    DEFINE[../../libcrypto]=OPENSSL_OQS_ACCEL
+ENDIF

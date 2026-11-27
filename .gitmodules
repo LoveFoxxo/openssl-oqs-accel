@@ -1,0 +1,58 @@
+[submodule "pyca.cryptography"]
+	path = pyca-cryptography
+	url = https://github.com/pyca/cryptography.git
+
+[submodule "krb5"]
+	path = krb5
+	url = https://github.com/krb5/krb5
+
+[submodule "gost-engine"]
+	path = gost-engine
+	url = https://github.com/gost-engine/engine
+	update = rebase
+[submodule "wycheproof"]
+	path = wycheproof
+	url = https://github.com/google/wycheproof
+[submodule "tlsfuzzer"]
+	path = tlsfuzzer
+	url = https://github.com/tlsfuzzer/tlsfuzzer
+[submodule "python-ecdsa"]
+	path = python-ecdsa
+	url = https://github.com/tlsfuzzer/python-ecdsa
+[submodule "tlslite-ng"]
+	path = tlslite-ng
+	url = https://github.com/tlsfuzzer/tlslite-ng
+[submodule "oqs-provider"]
+	path = oqs-provider
+	url = https://github.com/open-quantum-safe/oqs-provider.git
+[submodule "cloudflare-quiche"]
+	path = cloudflare-quiche
+	url = https://github.com/cloudflare/quiche
+[submodule "fuzz/corpora"]
+	path = fuzz/corpora
+	url = https://github.com/openssl/fuzz-corpora
+	branch = main
+[submodule "pkcs11-provider"]
+	path = pkcs11-provider
+	url = https://github.com/latchset/pkcs11-provider.git
+[submodule "crypto-auditing"]
+	path = crypto-auditing
+	url = https://github.com/latchset/crypto-auditing.git
+[submodule "zlib"]
+	path = zlib
+	url = https://github.com/madler/zlib.git
+[submodule "zstd"]
+	path = zstd
+	url = https://github.com/meta/zstd.git
+[submodule "liboqs"]
+	path = liboqs
+	url = https://github.com/open-quantum-safe/liboqs.git
+[submodule "perl5"]
+	path = perl5
+	url = https://github.com/Perl/perl5.git
+[submodule "nasm"]
+	path = nasm
+	url = https://github.com/netwide-assembler/nasm.git
+[submodule "brotli"]
+	path = brotli
+	url = https://github.com/google/brotli.git
