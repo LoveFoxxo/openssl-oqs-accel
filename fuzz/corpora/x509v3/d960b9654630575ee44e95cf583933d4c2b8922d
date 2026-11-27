@@ -1,9 +1,0 @@
-
-authorityKeyIdentifier =issuer
-# [ thys
-proxyCertInfo=critical,@proxy_ext
-
-#™#icT
-
-[ proxy_ext ]policyConstratints
-language=idea-ecb

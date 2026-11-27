@@ -1,4 +1,0 @@
-
-authorityKeyIdentifier =issuer
-[default]
-extendedKeyUsage= serverAuth,OCSP,ipsecIKE,0™.2et

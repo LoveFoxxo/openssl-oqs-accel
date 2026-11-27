@@ -1,4 +1,0 @@
-[default]
-crlDistributionPoints = alternative_name's
-[alternative_names]
-oer.0 =rName.0

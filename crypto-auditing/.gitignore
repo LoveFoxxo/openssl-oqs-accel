@@ -1,4 +1,0 @@
-agent/src/bpf/vmlinux.h
-agent/tests/agenttest/src/bpf/vmlinux.h
-scripts/*.csv
-target/

@@ -1,9 +1,0 @@
-
-authorityKeyIdentifier =issuer
-[default]s
-2.2.1.2.84=ASN1:INT:-0x10
-
-2.14=ASN1:INT:-0x108
-
-2.84=ASN1:INT:0
-

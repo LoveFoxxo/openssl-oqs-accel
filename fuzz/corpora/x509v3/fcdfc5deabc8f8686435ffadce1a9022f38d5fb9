@@ -1,6 +1,0 @@
-
-authorityKeyIdentifier =issu
-inhibitAnyPolicy =555555555555555
-authorityKeyIdentifier =issuer
-
-policyConstraints =  critical,requireExplicitPolicy:2,inhib itRFFF

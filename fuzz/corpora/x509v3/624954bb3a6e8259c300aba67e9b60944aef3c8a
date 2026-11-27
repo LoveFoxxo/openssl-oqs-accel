@@ -1,4 +1,0 @@
-
-authorityKeyIdentifier =issuer
-
-2.2.3 = critical,ASN1:BOOLEAN:,AB

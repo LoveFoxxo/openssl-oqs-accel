@@ -1,5 +1,0 @@
-[default]
-crlDistributionPoints = URI:h~t
-authorityKeyIdentifier =issuer
-[default]
-subjectAltName =ÿ91

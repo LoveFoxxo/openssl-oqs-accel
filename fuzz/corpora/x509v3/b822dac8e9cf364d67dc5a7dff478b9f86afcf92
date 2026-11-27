@@ -1,2 +1,0 @@
-[default]
-keyUsage = critical,digitalSignature,nonRepudiation,keyEncipherment,keyAgreement,decipherOnly

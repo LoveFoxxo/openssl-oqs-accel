@@ -1,7 +1,0 @@
-
-authorityKeyIdentifier =issuer
-[default]
-subjectAltName = @alternative_names
-
-[alternative_names]
-otherName=.40;UTc:7410aueifvilid4443et

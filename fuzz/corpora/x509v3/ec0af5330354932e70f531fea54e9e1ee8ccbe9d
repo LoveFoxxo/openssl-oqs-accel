@@ -1,5 +1,0 @@
-
-authorityKeyIdentifier =issuer
-[default]ribut
-nameConstraints = critical,permitted;IP::192.0/5.1
-e.0 =

@@ -1,4 +1,0 @@
-
-authorityKeyIdentifier =issuer
-[default]át
-extendedKeyUsage = serverAuth,cnd:c@s.n

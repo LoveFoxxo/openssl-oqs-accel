@@ -1,4 +1,0 @@
-
-authorityKeyIdentifier =issuer
-[default]
-nameConstraints = permitted;IP:::::/ffff:ff

@@ -1,5 +1,0 @@
-
-authorityKeyIdentifier =issuer
-[default]
-basicConstraints = critical,CA:YES
-keyUsage =me
